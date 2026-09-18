@@ -51,25 +51,7 @@
             height: 100%;
             object-fit: cover;
             display: block;
-            transition: opacity 0.15s ease;
-        }
-
-        /* indikator loading (opsional, muncul saat preload) */
-        .preload-status {
-            position: absolute;
-            bottom: 8px;
-            right: 10px;
-            background: rgba(0,0,0,0.6);
-            color: #ffd966;
-            font-size: 0.7rem;
-            padding: 3px 10px;
-            border-radius: 20px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .preload-status.show {
-            opacity: 1;
+            transition: opacity 0.25s ease;
         }
 
         /* info & kontrol */
@@ -284,14 +266,20 @@
             object-fit: cover;
             display: block;
         }
+
+        .small-note {
+            color: #777;
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
     <div class="app">
         <!-- Frame foto utama 2:3 -->
         <div class="photo-frame">
-            <img id="mainImage" src="" alt="Foto utama">
-            <div class="preload-status" id="preloadStatus">Memuat…</div>
+            <img id="mainImage" src="wkk-001.webp" alt="Foto utama">
         </div>
 
         <!-- Info & tombol musik -->
@@ -321,24 +309,23 @@
         </div>
     </div>
 
-    <!-- AUDIO ELEMENT -->
+    <!-- AUDIO ELEMENT (lagu Tongue-Tied.mp3) -->
     <audio id="bgMusic" src="Tongue-Tied.mp3" loop preload="auto"></audio>
 
     <script>
         (function() {
-            // ================= KONFIGURASI =================
-            const TOTAL_FOTOS   = 61;
-            const INTERVAL_MS   = 1500;  // ganti foto tiap 1.5 detik
-            const PRELOAD_CONCURRENT = 6; // jumlah gambar yang dimuat paralel
+            // KONFIGURASI
+            const TOTAL_FOTOS = 61;
+            const INTERVAL_MS = 2500; // ganti foto tiap 1.5 detik
 
-            // ================= DAFTAR FILE =================
+            // Daftar nama file: wkk-001.webp ... wkk-061.webp
             const fotoFiles = [];
             for (let i = 1; i <= TOTAL_FOTOS; i++) {
                 const num = i.toString().padStart(3, '0');
                 fotoFiles.push(`wkk-${num}.webp`);
             }
 
-            // ================= DOM =================
+            // DOM elements
             const mainImage      = document.getElementById('mainImage');
             const counterDisplay = document.getElementById('counterDisplay');
             const musicToggle    = document.getElementById('musicToggle');
@@ -348,98 +335,31 @@
             const listModal      = document.getElementById('listModal');
             const closeListBtn   = document.getElementById('closeListBtn');
             const fotoGrid       = document.getElementById('fotoGrid');
-            const preloadStatus  = document.getElementById('preloadStatus');
 
-            // ================= STATE =================
+            // State
             let currentIndex   = 0;
             let autoInterval   = null;
             let isPlayingMusic = false;
             let isModalOpen    = false;
 
-            // ================= CACHE / PRELOAD =================
-            // Menyimpan objek Image() yang sudah dimuat ke memori.
-            // Selama halaman tidak di-refresh, gambar tidak akan dimuat ulang
-            // karena browser sudah menyimpannya di cache memori + HTTP cache.
-            const imageCache = new Array(TOTAL_FOTOS).fill(null);
-            let loadedCount   = 0;
-
-            function updatePreloadStatus() {
-                if (loadedCount >= TOTAL_FOTOS) {
-                    preloadStatus.classList.remove('show');
-                } else {
-                    preloadStatus.textContent = `Memuat ${loadedCount}/${TOTAL_FOTOS}`;
-                    preloadStatus.classList.add('show');
-                }
-            }
-
-            // Preload semua gambar secara bertahap (paralel terbatas)
-            function preloadAllImages() {
-                let nextIndex = 0;
-
-                function loadNext() {
-                    if (nextIndex >= TOTAL_FOTOS) return;
-                    const idx = nextIndex++;
-                    const img = new Image();
-
-                    img.onload = img.onerror = () => {
-                        imageCache[idx] = img;
-                        loadedCount++;
-                        updatePreloadStatus();
-                        loadNext(); // lanjut ke berikutnya
-                    };
-
-                    // decode() agar gambar siap dirender tanpa jeda
-                    img.src = fotoFiles[idx];
-                    if (img.decode) {
-                        img.decode().catch(() => {});
-                    }
-                }
-
-                // Jalankan beberapa worker paralel
-                const workers = Math.min(PRELOAD_CONCURRENT, TOTAL_FOTOS);
-                for (let w = 0; w < workers; w++) {
-                    loadNext();
-                }
-                updatePreloadStatus();
-            }
-
-            // Ambil gambar dari cache (instan). Jika belum selesai dimuat,
-            // tetap pakai path file — browser akan menampilkan dari cache HTTP.
-            function getCachedImage(index) {
-                const cached = imageCache[index];
-                if (cached && cached.complete && cached.src) {
-                    return cached.src;
-                }
-                return fotoFiles[index];
-            }
-
-            // ================= GANTI FOTO =================
+            // Muat gambar berdasarkan index
             function loadImageByIndex(index) {
                 if (index < 0 || index >= TOTAL_FOTOS) return;
-                const newSrc = getCachedImage(index);
-
-                // Hanya update kalau src berbeda (hindari reload tak perlu)
-                if (mainImage.src !== newSrc) {
-                    // transisi halus: fade out → ganti → fade in
-                    mainImage.style.opacity = '0';
-                    setTimeout(() => {
-                        mainImage.src = newSrc;
-                        mainImage.alt = `Foto ${index + 1}`;
-                        mainImage.style.opacity = '1';
-                    }, 80);
-                }
-
+                mainImage.src = fotoFiles[index];
+                mainImage.alt = `Foto ${index + 1}`;
                 currentIndex = index;
                 counterDisplay.textContent = `${currentIndex + 1} / ${TOTAL_FOTOS}`;
                 if (isModalOpen) highlightActiveThumbnail(index);
             }
 
+            // Sorot thumbnail aktif di grid
             function highlightActiveThumbnail(activeIdx) {
                 document.querySelectorAll('.foto-item').forEach((item, idx) => {
                     item.classList.toggle('active', idx === activeIdx);
                 });
             }
 
+            // Mulai auto ganti foto
             function startAutoSlide() {
                 if (autoInterval) clearInterval(autoInterval);
                 autoInterval = setInterval(() => {
@@ -447,7 +367,7 @@
                 }, INTERVAL_MS);
             }
 
-            // ================= MUSIK =================
+            // ---------- MUSIK ----------
             function updateMusicUI() {
                 if (isPlayingMusic) {
                     musicLabel.textContent = '🔊 Musik On';
@@ -475,6 +395,7 @@
                             updateMusicUI();
                         });
                     } else {
+                        // browser lawas
                         bgMusic.play();
                         isPlayingMusic = true;
                         updateMusicUI();
@@ -482,7 +403,7 @@
                 }
             }
 
-            // ================= MODAL DAFTAR FOTO =================
+            // ---------- DAFTAR FOTO (MODAL) ----------
             function buildPhotoGrid() {
                 fotoGrid.innerHTML = '';
                 fotoFiles.forEach((file, idx) => {
@@ -491,8 +412,7 @@
                     item.dataset.index = idx;
 
                     const img = document.createElement('img');
-                    // pakai cache jika tersedia
-                    img.src = getCachedImage(idx);
+                    img.src = file;
                     img.alt = `Foto ${idx + 1}`;
                     img.loading = 'lazy';
                     item.appendChild(img);
@@ -516,7 +436,7 @@
                 isModalOpen = false;
             }
 
-            // ================= EVENT =================
+            // ---------- EVENT LISTENERS ----------
             musicToggle.addEventListener('click', safeToggleMusic);
             listBtn.addEventListener('click', openModal);
             closeListBtn.addEventListener('click', closeModal);
@@ -529,21 +449,11 @@
                 if (e.key === 'Escape' && isModalOpen) closeModal();
             });
 
-            // ================= INIT =================
+            // ---------- INISIALISASI ----------
             function init() {
-                // 1) Preload semua gambar ke cache
-                preloadAllImages();
-
-                // 2) Tampilkan foto pertama segera (dari file langsung)
-                mainImage.src = fotoFiles[0];
-                mainImage.alt = 'Foto 1';
-                mainImage.style.opacity = '1';
-                counterDisplay.textContent = `1 / ${TOTAL_FOTOS}`;
-
-                // 3) Mulai auto slide
+                loadImageByIndex(0);
+                buildPhotoGrid();
                 startAutoSlide();
-
-                // 4) Musik
                 isPlayingMusic = false;
                 updateMusicUI();
                 bgMusic.volume = 0.7;
@@ -551,7 +461,7 @@
 
             init();
 
-            // Tangani error gambar
+            // Tangani jika gambar utama error
             mainImage.addEventListener('error', function() {
                 console.warn('Gambar gagal dimuat:', mainImage.src);
             });
